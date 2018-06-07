@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-
-# Copyright (C) 2014-2015 by the Free Software Foundation, Inc.
+#
+# Copyright (C) 2014-2017 by the Free Software Foundation, Inc.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -29,8 +29,6 @@ missing email in the database, in case it was added in the meantime.
 This can happen if HK receives the reply before the original message (when a
 mail server in the chain has an issue, or in case of greylisting for example).
 """
-
-from __future__ import absolute_import, print_function, unicode_literals
 
 from django_extensions.management.jobs import BaseJob
 from hyperkitty.models import Email

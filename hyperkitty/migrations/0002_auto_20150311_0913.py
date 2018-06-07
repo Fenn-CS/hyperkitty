@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
-# pylint: skip-file
-from __future__ import unicode_literals
-
+# flake8: noqa
 from django.db import models, migrations
 
 

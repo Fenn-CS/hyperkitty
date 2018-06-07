@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-# Copyright (C) 1998-2012 by the Free Software Foundation, Inc.
+#
+# Copyright (C) 2012-2017 by the Free Software Foundation, Inc.
 #
 # This file is part of HyperKitty.
 #
@@ -18,11 +19,11 @@
 #
 #
 
-from __future__ import absolute_import
-
 from django.shortcuts import render
+
 
 def categories(request):
     return render(request, "hyperkitty/errors/notimplemented.html", {
-        "mockup": "http://blog.linuxgrrl.com/2013/09/11/hyperkitty-categories/",
+        "mockup": "http://blog.linuxgrrl.com/2013/09/11/"
+                  "hyperkitty-categories/",
     })

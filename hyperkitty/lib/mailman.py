@@ -1,5 +1,6 @@
-#-*- coding: utf-8 -*-
-# Copyright (C) 1998-2012 by the Free Software Foundation, Inc.
+# -*- coding: utf-8 -*-
+#
+# Copyright (C) 2012-2017 by the Free Software Foundation, Inc.
 #
 # This file is part of HyperKitty.
 #
@@ -19,13 +20,12 @@
 # Author: Aurelien Bompard <abompard@fedoraproject.org>
 #
 
-from __future__ import absolute_import, unicode_literals
+from urllib.error import HTTPError
 
-from django.conf import settings
-from django.utils.timezone import now
-from mailmanclient import Client, MailmanConnectionError
+from django_mailman3.lib.cache import cache
+from django_mailman3.lib.mailman import get_mailman_client
+from mailmanclient import MailmanConnectionError
 
-from hyperkitty.lib.cache import cache
 
 import logging
 logger = logging.getLogger(__name__)
@@ -35,68 +35,94 @@ class ModeratedListException(Exception):
     pass
 
 
-MailmanClient = Client
-def get_mailman_client():
-    # easier to patch during unit tests
-    client = MailmanClient('%s/3.0' %
-                settings.MAILMAN_REST_SERVER,
-                settings.MAILMAN_API_USER,
-                settings.MAILMAN_API_PASS)
-    return client
-
-
-def subscribe(list_address, user):
+def subscribe(list_id, user, email=None, display_name=None):
+    if email is None:
+        email = user.email
+    if display_name is None:
+        display_name = "%s %s" % (user.first_name, user.last_name)
     client = get_mailman_client()
-    rest_list = client.get_list(list_address)
+    rest_list = client.get_list(list_id)
     subscription_policy = rest_list.settings.get(
         "subscription_policy", "moderate")
-    # Add a flag to return that would tell the user they have been subscribed to
-    # the current list.
+    # Add a flag to return that would tell the user they have been subscribed
+    # to the current list.
     subscribed_now = False
     try:
-        member = rest_list.get_member(user.email)
+        member = rest_list.get_member(email)
     except ValueError:
         # We don't want to bypass moderation, don't subscribe. Instead
         # raise an error so that it can be caught to show the user
         if subscription_policy in ("moderate", "confirm_then_moderate"):
-            raise ModeratedListException("This list is moderated, please subscribe"
-                                         " to it before posting.")
+            raise ModeratedListException(
+                "This list is moderated, please subscribe"
+                " to it before posting.")
 
         # not subscribed yet, subscribe the user without email delivery
-        member = rest_list.subscribe(user.email,
-                "%s %s" % (user.first_name, user.last_name),
-                pre_verified=True, pre_confirmed=True)
+        try:
+            member = rest_list.subscribe(
+                email, display_name, pre_verified=True, pre_confirmed=True)
+        except HTTPError as e:
+            if e.code == 409:
+                logger.info("Subscription for %s to %s is already pending",
+                            email, list_id)
+                return subscribed_now
+            else:
+                raise
         # The result can be a Member object or a dict if the subscription can't
         # be done directly, or if it's pending, or something else.
         # Broken API :-(
         if isinstance(member, dict):
             logger.info("Subscription for %s to %s is pending",
-                        user.email, list_address)
+                        email, list_id)
             return subscribed_now
         member.preferences["delivery_status"] = "by_user"
         member.preferences.save()
         subscribed_now = True
-        cache.delete("User:%s:subscriptions" % user.id)
+        cache.delete("User:%s:subscriptions" % user.id, version=2)
         logger.info("Subscribing %s to %s on first post",
-                    user.email, list_address)
+                    email, list_id)
 
     return subscribed_now
 
-class FakeMMList:
-    def __init__(self, name):
-        self.fqdn_listname = name
-        self.display_name = name.partition("@")[0]
-        self.settings = {
-            "description": "",
-            "subject_prefix": "[%s] " % self.display_name,
-            "created_at": now().isoformat(),
-            "archive_policy": "public",
-            }
 
-class FakeMMMember:
-    def __init__(self, list_id, address):
-        self.list_id = list_id
-        self.address = address
+def get_new_lists_from_mailman():
+    from hyperkitty.models import MailingList
+    mmclient = get_mailman_client()
+    page_num = 0
+    while page_num < 10000:  # Just for security
+        page_num += 1
+        try:
+            mlist_page = mmclient.get_list_page(count=10, page=page_num)
+        except MailmanConnectionError:
+            break
+        except HTTPError:
+            break  # can't update at this time
+        for mm_list in mlist_page:
+            if MailingList.objects.filter(name=mm_list.fqdn_listname).exists():
+                continue
+            if mm_list.settings["archive_policy"] == "never":
+                continue  # Should we display those lists anyway?
+            logger.info("Imported the new list %s from Mailman",
+                        mm_list.fqdn_listname)
+            mlist = MailingList.objects.create(name=mm_list.fqdn_listname)
+            mlist.update_from_mailman()
+        if not mlist_page.has_next:
+            break
+
+
+def import_list_from_mailman(list_id):
+    from hyperkitty.models import MailingList
+    mmclient = get_mailman_client()
+    try:
+        mm_list = mmclient.get_list(list_id)
+    except (MailmanConnectionError, HTTPError):
+        return
+    mlist, created = MailingList.objects.get_or_create(
+        name=mm_list.fqdn_listname)
+    if created:
+        logger.info("Imported the new list %s from Mailman",
+                    mm_list.fqdn_listname)
+    mlist.update_from_mailman()
 
 
 def sync_with_mailman(overwrite=False):
@@ -118,17 +144,18 @@ def sync_with_mailman(overwrite=False):
             for sender in query.all()[lower_bound:upper_bound]:
                 sender.set_mailman_id()
         except MailmanConnectionError:
-            break # Can't refresh at this time
+            break  # Can't refresh at this time
         count = query.count()
         if count == 0:
-            break # all done
+            break  # all done
         if count == prev_count:
             # no improvement...
             if count < upper_bound:
-                break # ...and all users checked
+                break  # ...and all users checked
             else:
                 # there may be some more left
                 lower_bound = upper_bound
                 upper_bound += buffer_size
         prev_count = count
-        logger.info("%d emails left to refresh", count)
+        logger.info("%d emails left to refresh, checked %d",
+                    count, lower_bound)

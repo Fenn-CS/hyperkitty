@@ -10,7 +10,7 @@ The project page is https://gitlab.com/mailman/hyperkitty.
 There is a `demo server`_ available, but it's also a development server, so it
 may be broken at the time you access it. It's usually OK though.
 
-.. _demo server: https://lists.stg.fedoraproject.org/archives/
+.. _demo server: https://lists.fedoraproject.org/archives/
 
 
 The authors are listed in the ``AUTHORS.txt`` file.
@@ -34,7 +34,7 @@ more sophisticated than the current archiver can deliver on. Mailman3 is the
 currently under active development and it offers a pluggable architecture where
 multiple archivers can be plugged to the core without too much pain.
 
-Some of drawbacks of Pipermail :
+Some of the drawbacks of Pipermail :
 
 - It does not support stable URLs.
 - It has scalability issues (it was not suitable for organizations working with
@@ -48,7 +48,7 @@ The HyperKitty archiver addresses most of the drawbacks of Pipermail.
 Copyright
 =========
 
-Copyright (C) 2012 by the Free Software Foundation, Inc.
+Copyright (C) 2012-2018 by the Free Software Foundation, Inc.
 
 HyperKitty is free software: you can redistribute it and/or
 modify it under the terms of the GNU General Public License as
