@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+# flake8: noqa
 
 from django.db import models, migrations
 
 
-def find_starting_email(apps, schema_editor): # pylint: disable-msg=unused-argument
+def find_starting_email(apps, schema_editor):
     # We can't import the Thread model directly as it may be a newer
     # version than this migration expects. We use the historical version.
     Thread = apps.get_model("hyperkitty", "Thread")
@@ -26,7 +26,9 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='thread',
             name='starting_email',
-            field=models.OneToOneField(related_name='started_thread', null=True, to='hyperkitty.Email'),
+            field=models.OneToOneField(related_name='started_thread',
+                                       null=True, to='hyperkitty.Email',
+                                       on_delete=models.CASCADE),
         ),
         migrations.RunPython(find_starting_email),
     ]
