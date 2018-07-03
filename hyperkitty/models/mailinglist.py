@@ -161,6 +161,15 @@ class MailingList(models.Model):
         """Threads with the most votes."""
         return self.cached_values["popular_threads"]()
 
+    def get_participants(self, begin_date, end_date):
+        """Get list of senders who posted on the mailing list 
+        between begin_date and end_date"""
+
+        return self.emails.filter(
+                 date__gte=begin_date, 
+                 date__lt=end_date
+                ).values("sender_id").distinct()
+    
     def update_from_mailman(self):
         try:
             client = get_mailman_client()

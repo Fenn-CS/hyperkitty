@@ -31,7 +31,7 @@ from hyperkitty.api import (
     thread as api_thread, tag as api_tag)
 from hyperkitty.views import (
     index, accounts, users, mlist, message, thread, search, categories, tags,
-    mailman, compat)
+    mailman, compat, all_threads)
 
 
 # flake8: noqa
@@ -153,6 +153,8 @@ urlpatterns = [
 
     # Search
     url(r'^search$', search.search, name='hk_search'),
+    url(r'^all_threads/(?P<mlist>[^/@]+@[^/@]+)', all_threads.subject_lines),
+    url(r'^all_threads/participants/(?P<mlist>[^/@]+@[^/@]+)', all_threads.members_who_posted),
 
     # Categories and Tags
     url(r'^categories/$', categories.categories, name='hk_categories_overview'),
